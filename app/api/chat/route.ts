@@ -3,7 +3,6 @@ import { createManualToolStreamResponse } from '@/lib/streaming/create-manual-to
 import { createToolCallingStreamResponse } from '@/lib/streaming/create-tool-calling-stream'
 import { Model } from '@/lib/types/models'
 import { isProviderEnabled } from '@/lib/utils/registry'
-import { cookies } from 'next/headers'
 
 export const maxDuration = 30
 
@@ -30,18 +29,28 @@ export async function POST(req: Request) {
       })
     }
 
-    const cookieStore = await cookies()
-    const modelJson = cookieStore.get('selectedModel')?.value
-    const searchMode = cookieStore.get('search-mode')?.value === 'true'
-
+    // Get cookies from the request headers instead of using the cookies() function
+    const cookieHeader = req.headers.get('cookie')
     let selectedModel = DEFAULT_MODEL
+    let searchMode = false
 
-    if (modelJson) {
-      try {
-        selectedModel = JSON.parse(modelJson) as Model
-      } catch (e) {
-        console.error('Failed to parse selected model:', e)
+    if (cookieHeader) {
+      const cookies = Object.fromEntries(
+        cookieHeader.split('; ').map(cookie => {
+          const [name, value] = cookie.split('=')
+          return [name, decodeURIComponent(value)]
+        })
+      )
+
+      if (cookies.selectedModel) {
+        try {
+          selectedModel = JSON.parse(cookies.selectedModel) as Model
+        } catch (e) {
+          console.error('Failed to parse selected model:', e)
+        }
       }
+
+      searchMode = cookies['search-mode'] === 'true'
     }
 
     if (
